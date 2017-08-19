@@ -437,10 +437,11 @@ defmodule HTTPoison.Base do
     hn_options = build_hackney_options(module, options)
 
     case do_request(method, request_url, request_headers, request_body, hn_options) do
-      {:ok, status_code, headers} -> response(process_status_code, process_headers, process_response_body, status_code, headers, "", request_url)
+      {:ok, status_code, headers} -> response(process_status_code, process_headers, process_response_body, status_code, headers, "", request_url, nil)
       {:ok, status_code, headers, client} ->
+        location = :hackney.location(client) # FIXME The current version of Hackney (0.8) requires that we read the location before the body.
         case :hackney.body(client) do
-          {:ok, body} -> response(process_status_code, process_headers, process_response_body, status_code, headers, body, request_url)
+          {:ok, body} -> response(process_status_code, process_headers, process_response_body, status_code, headers, body, request_url, location)
           {:error, reason} -> {:error, %Error{reason: reason} }
         end
       {:ok, id} -> { :ok, %HTTPoison.AsyncResponse{ id: id } }
@@ -471,12 +472,13 @@ defmodule HTTPoison.Base do
                           request_body, hn_options)
   end
 
-  defp response(process_status_code, process_headers, process_response_body, status_code, headers, body, request_url) do
+  defp response(process_status_code, process_headers, process_response_body, status_code, headers, body, request_url, location) do
     {:ok, %Response {
       status_code: process_status_code.(status_code),
       headers: process_headers.(headers),
       body: process_response_body.(body),
-      request_url: request_url
+      request_url: request_url,
+      location: location,
     } }
   end
 end
